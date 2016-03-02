@@ -12,26 +12,26 @@ import Commander.Commands as Commands
 --
 -- testing lark
 --
-test = commands $ do
+--test = commands $ do
 
-    command "hello" $ do
+--    command "hello" $ do
 
-        help "This is the hello command"
+--        help "This is the hello command"
 
-        command "no" (return ())
+--        command "no" (return ())
 
-        command "wee" $ do
-            help "This is the weeeee command."
-            run $
-                \(Flag a :: Flag '["c"] "count"  Int)
-                 (Flag s :: Flag '["s"] "string" Char) ->
-                  putStrLn ("one! " ++ [s] ++ show a)
+--        command "wee" $ do
+--            help "This is the weeeee command."
+--            run $
+--                \(Flag a :: Flag '["c"] "count"  Int)
+--                 (Flag s :: Flag '["s"] "string" Char) ->
+--                  putStrLn ("one! " ++ [s] ++ show a)
 
-    command "bye" $ do
+--    command "bye" $ do
 
-        help "This is the bye command"
+--        help "This is the bye command"
 
-        command "woop" (return ())
+--        command "woop" (return ())
 
 
 --testFn1 = \(Flag a :: Flag Int  '["c"] "count")

@@ -14,24 +14,28 @@ module Commander.Params (
 import Data.Proxy (Proxy(..))
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Text.Read (readMaybe)
-import Commander.Commands (IsParameter(..))
+import Commander.Commands (ToParam(..), ParamFlags(..), ParamHelp(..))
 
 --
 -- Flag and Value types to encode information we want.
 --
 data Flag (flags :: [Symbol]) (help :: Symbol) a = Flag a
 
-instance (FromText a, KnownSymbols flags, KnownSymbol help) => IsParameter (Flag flags help a) where
+instance FromText a => ToParam (Flag flags help a) where
+    toParam str = fmap Flag (fromText str)
+instance KnownSymbols flags => ParamFlags (Flag flags help a) where
     paramFlags _ = Just $ symbolVals (Proxy :: Proxy flags)
+instance KnownSymbol help => ParamHelp (Flag flags help a) where
     paramHelp  _ = symbolVal (Proxy :: Proxy help)
-    toParam  str = fmap Flag (fromText str)
 
 data Value (help :: Symbol) a = Value a
 
-instance (FromText a, KnownSymbol help) => IsParameter (Value help a) where
-    paramFlags _ = Nothing
-    paramHelp  _ = symbolVal (Proxy :: Proxy help)
+instance FromText a => ToParam (Value help a) where
     toParam  str = fmap Value (fromText str)
+instance ParamFlags (Value help a) where
+    paramFlags _ = Nothing
+instance KnownSymbol help => ParamHelp (Value help a) where
+    paramHelp  _ = symbolVal (Proxy :: Proxy help)
 
 --
 -- Typeclass to extract details from flag/value type, or construct the
