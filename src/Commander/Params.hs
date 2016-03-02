@@ -1,0 +1,56 @@
+{-# LANGUAGE
+    KindSignatures,
+    DataKinds,
+    TypeOperators,
+    FlexibleInstances,
+    UndecidableInstances,
+    ScopedTypeVariables #-}
+
+module Commander.Params (
+    Flag(..),
+    Value(..)
+) where
+
+import Data.Proxy (Proxy(..))
+import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
+import Text.Read (readMaybe)
+import Commander.Commands (IsParameter(..))
+
+--
+-- Flag and Value types to encode information we want.
+--
+data Flag (flags :: [Symbol]) (help :: Symbol) a = Flag a
+
+instance (FromText a, KnownSymbols flags, KnownSymbol help) => IsParameter (Flag flags help a) where
+    paramFlags _ = Just $ symbolVals (Proxy :: Proxy flags)
+    paramHelp  _ = symbolVal (Proxy :: Proxy help)
+    toParam  str = fmap Flag (fromText str)
+
+data Value (help :: Symbol) a = Value a
+
+instance (FromText a, KnownSymbol help) => IsParameter (Value help a) where
+    paramFlags _ = Nothing
+    paramHelp  _ = symbolVal (Proxy :: Proxy help)
+    toParam  str = fmap Value (fromText str)
+
+--
+-- Typeclass to extract details from flag/value type, or construct the
+-- type from some string. This allows custom types to be used instead of
+-- the above.
+--
+
+class FromText a where
+    fromText :: String -> Maybe a
+
+instance {-# OVERLAPPABLE #-} Read a => FromText a where
+    fromText = readMaybe
+
+--
+-- Extract array of strings from [Symbol]
+--
+class KnownSymbols (s :: [Symbol]) where
+    symbolVals :: proxy s -> [String]
+instance (KnownSymbol s, KnownSymbols ss) => KnownSymbols (s ': ss) where
+    symbolVals _ = symbolVal (Proxy :: Proxy s) : symbolVals (Proxy :: Proxy ss)
+instance KnownSymbols '[] where
+    symbolVals _ = []
