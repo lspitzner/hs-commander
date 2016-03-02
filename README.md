@@ -39,13 +39,15 @@ The novelty of this approach (compared to others I have seen, which is a non exh
 # Installation
 
 1. Add this repository to your stack.yaml file under the packages folder, so we end up with somehting that looks a bit like:
-   ```
-   packages:
-   - '.'
-   - location:
+
+    ```
+    packages:
+    - '.'
+    - location:
        git: https://github.com/jsdw/hs-commander
        commit: abcdef123456789abcdef1234
-   ```
+    ```
+
 2. run `stack install`.
 3. import `Commander` into your library.
 
