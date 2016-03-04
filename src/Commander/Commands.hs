@@ -27,6 +27,7 @@ module Commander.Commands (
     --
     Command(..),
     Commands,
+    CommandError(..),
 
     --
     -- Functions that work in the Commands monad:
@@ -52,7 +53,7 @@ import Data.Proxy (Proxy(..))
 type IsParameter a = (ToParam a, ParamFlags a, ParamHelp a)
 
 class ToParam a where
-    toParam :: String -> Maybe a
+    toParam :: String -> Either String a
 
 class ParamFlags a where
     paramFlags :: proxy a -> Maybe [String]
@@ -67,7 +68,7 @@ class ParamHelp a where
 -- and output its result. We use a type family to tie our fn and out params.
 --
 
-injectParams :: Map String String -> [String] -> Fn out -> Maybe out
+injectParams :: Map String String -> [String] -> Fn out -> Either CommandError out
 injectParams flags vals fnWrapper = case fnWrapper of Fn fn -> injectParameters flags vals fn
 
 type family FnOut fn where
@@ -75,24 +76,40 @@ type family FnOut fn where
     FnOut a = a
 
 class FnOut fn ~ out => InjectParameters fn out where
-    injectParameters :: Map String String -> [String] -> fn -> Maybe out
+    injectParameters :: Map String String -> [String] -> fn -> Either CommandError out
 
 instance (IsParameter a, InjectParameters b out) => InjectParameters (a -> b) out where
     injectParameters flags vals fn = case paramFlags (Proxy :: Proxy a) of
+        -- the thing looks like a flag, but doesnt actually have any!
+        Just [] -> Left (ErrFlagNotFound [])
+        -- the thing does have flags.
         Just fs -> injectFlag fs
+        -- the thing is a value.
         Nothing -> injectValue
       where
         injectFlag fs = do
-            str <- Maybe.listToMaybe $ Maybe.catMaybes $ fmap (flip Map.lookup flags) fs
-            param <- toParam str
+            str <- toEither (ErrFlagNotFound fs)
+                 $ Maybe.listToMaybe
+                 $ Maybe.catMaybes
+                 $ fmap (flip Map.lookup flags) fs
+            param <- mapLeft (ErrCastingFlag str) $ toParam str
             injectParameters flags vals (fn param)
         injectValue = do
-            str <- Maybe.listToMaybe vals
-            param <- toParam str
+            str   <- toEither ErrNotEnoughInput $ Maybe.listToMaybe vals
+            param <- mapLeft (ErrCastingValue str) $ toParam str
             injectParameters flags (tail vals) (fn param)
 
 instance {-# OVERLAPPABLE #-} FnOut out ~ out => InjectParameters out out where
-    injectParameters _ _ output = Just output
+    injectParameters _ [] output = Right output
+    injectParameters _ vs _ = Left (ErrTooMuchInput vs)
+
+toEither :: a -> Maybe b -> Either a b
+toEither _ (Just b) = Right b
+toEither a Nothing = Left a
+
+mapLeft :: (a -> c) -> Either a b -> Either c b
+mapLeft fn (Left a)  = Left (fn a)
+mapLeft _ (Right b) = Right b
 
 --
 -- In addition to passing parameters in, we just want to get some details out
@@ -153,4 +170,14 @@ help txt = State.modify $ \c -> c { cmdHelp = txt }
 run :: (ExtractParameters fn out, InjectParameters fn out) => fn -> Commands out ()
 run fn = State.modify $ \c -> c { cmdFunc = Just (Fn fn) }
 
+--
+-- When things go wrong..
+--
 
+data CommandError
+    = ErrFlagNotFound [String]
+    | ErrTooMuchInput [String]
+    | ErrNotEnoughInput
+    | ErrCastingFlag String String -- flag that had issues, reason for issue
+    | ErrCastingValue String String -- value that had issues, reason for value
+    deriving (Eq,Show)

@@ -44,10 +44,12 @@ instance KnownSymbol help => ParamHelp (Value help a) where
 --
 
 class FromText a where
-    fromText :: String -> Maybe a
+    fromText :: String -> Either String a
 
 instance {-# OVERLAPPABLE #-} Read a => FromText a where
-    fromText = readMaybe
+    fromText str = case readMaybe str of
+        Nothing -> Left "string could not be cast to required type"
+        Just a  -> Right a
 
 --
 -- Extract array of strings from [Symbol]

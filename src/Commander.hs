@@ -9,9 +9,11 @@ import Commander.Params   as Params
 import Commander.Commands as Commands
 
 
---
--- testing lark
---
+----
+---- testing lark
+----
+--import qualified Data.Map as Map
+
 --test = commands $ do
 
 --    command "hello" $ do
@@ -34,14 +36,17 @@ import Commander.Commands as Commands
 --        command "woop" (return ())
 
 
---testFn1 = \(Flag a :: Flag Int  '["c"] "count")
---           (Flag s :: Flag Char '["s"] "string") ->
+--testFn1 = \(Flag a :: Flag   '["c"] "count" Int)
+--           (Flag s :: Flag  '["s"] "string" Char) ->
 --           putStrLn ("one! " ++ [s] ++ show a)
---testFn2 = \(Value a :: Value Int "some value1")
---           (Value b :: Value Int "some value2") ->
+--testFn2 = \(Value a :: Value  "some value1" Int)
+--           (Value b :: Value  "some value2" Int) ->
 --           putStrLn ("two! " ++ show a ++ show b)
 
---testFn3 = \(Flag a  :: Flag Int '["c"] "count")
---           (Value b :: Value Int "some value2") ->
+--testFn3 = \(Flag a  :: Flag  '["c"] "count" Int)
+--           (Value b :: Value  "some value2" Int) ->
 --           putStrLn ("three! " ++ show a ++ show b)
 
+--runTest vals flags fn = case injectParams (Map.fromList flags) vals (Fn fn) of
+--    Left err -> putStrLn ("Error: " ++ show err)
+--    Right res -> res
