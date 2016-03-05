@@ -1,44 +1,56 @@
 # Commander: A Haskell Library for parsing commands
 
-This library aims to make it super easy to create nested commands with flags in the form of an object that is easy to traverse and run custom actions on, and easy to extend with handling for safe casting to values from their input strings.
+This library aims to make it super easy to create and use nested commands with flags in the form of an object that is easy to traverse and run custom actions on, and easy to extend with handling for safe casting to values from their input strings.
 
-The desired outcome is that we define our commands along the lines of:
+As an example of usage (take a look in the _examples_ folder for more) we can define commands as follows:
 
 ```
-cmds = commands $ do
+someCommands :: Command (IO ())
+someCommands = commands $ do
 
-    command "hello" $ do
+    command "repeat" $ do
 
-        help "This is the hello command"
+        help "Repeat a string n times"
 
-        command "nope" $ do
-            help "This is the nope command."
+        run $
+            \(Value str :: Value "value to repeat" String)
+             (Flag n :: Flag '["n"] "times to repeat" Int) ->
+             sequence_ $ replicate n (putStrLn str)
+
+    command "calculate" $ do
+
+        help "perform calculations"
+
+        command "add" $ do
+
+            help "add two numbers"
+
             run $
-                \(Flag a :: Flag '["c"] "count"  Int)
-                 (Flag s :: Flag '["s"] "string" Char) ->
-                  putStrLn ("nope! " ++ [s] ++ show a)
+                \(Value n1 :: Value "number 1" Int)
+                 (Value n2 :: Value "number 2" Int)
+                 (Flag verbose :: Flag '["v", "verbose"] "verbose mode" Bool) ->
+                 if verbose
+                    then putStrLn $ (show n1) ++ " + " ++ (show n2) ++ " = " ++ (show $ n1 + n2)
+                    else putStrLn (show $ n1 + n2)
 
-        command "wee" $ do
-            help "This is the weeeee command."
+        command "multiply" $ do
+
+            help "multiply two numbers"
+
             run $
-                \(Flag a :: Flag '["c"] "count"  Int)
-                 (Flag s :: Flag '["s"] "string" Char) ->
-                  putStrLn ("weeee! " ++ [s] ++ show a)
+                \(Value n1 :: Value "number 1" Int)
+                 (Value n2 :: Value "number 2" Int) ->
+                 putStrLn $ (show n1) ++ " x " ++ (show n2) ++ " = " ++ (show $ n1 * n2)
 
-    command "bye" $ do
-
-        help "This is the bye command"
-
-        command "woop" (return ())
 ```
 
-And this leads to `cmds` being a nexted record of type `Command out` (where `out` is the output from the functions you provide to the `run` command), which can be traversed and interacted with.
+And this leads to `someCommands` being a nested record of type `Command (IO ())` (where `IO ()` corresponds to the output from the functions you provide). This record can then be traversed and interacted with.
 
 The novelty of this approach (compared to others I have seen, which is a non exhaustive list!) is the use of the functions input parameter types to cast-from-string and inject the appropriate values into the function safely at runtime, as well as to generate documentation. This means that we only declare the flags and values each command requires in one place, and do not execute any of the output unless all parameters are fully satisfied. These functions are then safely hidden away inside an existential type, and so we don't need any other type level magic or handling to work with the output.
 
 # Installation
 
-1. Add this repository to your stack.yaml file under the packages folder, so we end up with somehting that looks a bit like:
+1. Add this repository to your stack.yaml file under the packages folder, so we end up with something that looks a bit like:
 
     ```
     packages:
@@ -51,6 +63,8 @@ The novelty of this approach (compared to others I have seen, which is a non exh
 2. run `stack install`.
 3. import `Commander` into your library.
 
+you can run the example code by running `stack install :example1 && example1` assuming that the directory stack copies binaries to is present in your `PATH`.
+
 # Disclaimer
 
-This project is still under heavy development and so will likely change drastically!
+This project is still under heavy development and could well change drastically!

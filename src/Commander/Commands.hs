@@ -36,7 +36,13 @@ module Commander.Commands (
     commands,
     command,
     help,
-    run
+    run,
+
+    --
+    -- Functions that make use of the Command struct
+    --
+    evalCommand,
+    getCommand
 
 ) where
 
@@ -68,18 +74,18 @@ class ParamHelp a where
 -- and output its result. We use a type family to tie our fn and out params.
 --
 
-injectParams :: Map String String -> [String] -> Fn out -> Either CommandError out
-injectParams flags vals fnWrapper = case fnWrapper of Fn fn -> injectParameters flags vals fn
+injectParams :: [String] -> Map String String -> Fn out -> Either CommandError out
+injectParams vals flags fnWrapper = case fnWrapper of Fn fn -> injectParameters vals flags fn
 
 type family FnOut fn where
     FnOut (a -> b) = FnOut b
     FnOut a = a
 
 class FnOut fn ~ out => InjectParameters fn out where
-    injectParameters :: Map String String -> [String] -> fn -> Either CommandError out
+    injectParameters :: [String] -> Map String String -> fn -> Either CommandError out
 
 instance (IsParameter a, InjectParameters b out) => InjectParameters (a -> b) out where
-    injectParameters flags vals fn = case paramFlags (Proxy :: Proxy a) of
+    injectParameters vals flags fn = case paramFlags (Proxy :: Proxy a) of
         -- the thing looks like a flag, but doesnt actually have any!
         Just [] -> Left (ErrFlagNotFound [])
         -- the thing does have flags.
@@ -95,20 +101,16 @@ instance (IsParameter a, InjectParameters b out) => InjectParameters (a -> b) ou
                     $ filter (Maybe.isJust . snd)
                     $ fmap (\f -> (f, Map.lookup f flags)) fs
             param <- mapLeft (ErrCastingFlag flag) $ toParam mVal
-            injectParameters flags vals (fn param)
+            injectParameters vals flags (fn param)
         injectValue :: Either CommandError out
         injectValue = do
-            let mVal = Maybe.listToMaybe vals
-            param <- mapLeft ErrCastingValue $ toParam mVal
-            injectParameters flags (tail vals) (fn param)
+            val <- toEither ErrNotEnoughValues $ Maybe.listToMaybe vals
+            param <- mapLeft ErrCastingValue $ toParam (Just val)
+            injectParameters (tail vals) flags (fn param)
 
 instance {-# OVERLAPPABLE #-} FnOut out ~ out => InjectParameters out out where
-    injectParameters _ [] output = Right output
-    injectParameters _ vs _ = Left (ErrTooMuchInput vs)
-
-mapLeft :: (a -> c) -> Either a b -> Either c b
-mapLeft fn (Left a)  = Left (fn a)
-mapLeft _ (Right b) = Right b
+    injectParameters [] _ output = Right output
+    injectParameters vs _ _ = Left (ErrTooManyValues vs)
 
 --
 -- In addition to passing parameters in, we just want to get some details out
@@ -170,13 +172,63 @@ run :: (ExtractParameters fn out, InjectParameters fn out) => fn -> Commands out
 run fn = State.modify $ \c -> c { cmdFunc = Just (Fn fn) }
 
 --
+-- Making use of our command object
+--
+
+evalCommand :: [String] -> Map String String -> Command out -> Either CommandError out
+evalCommand path flags cmd = eval
+  where
+    -- eval cmd, trying to do nav step if fails:
+    eval = case cmdFunc cmd of
+        Nothing -> nav
+        Just fn -> injectParams path flags fn `catchEither` nav
+    -- navigate, complaining if we can't:
+    nav = do
+        (newPath, newCmd) <- stepIntoCommand path cmd
+        evalCommand newPath flags newCmd
+
+getCommand :: [String] -> Command out -> Either CommandError (Command out)
+getCommand [] cmd = Right cmd
+getCommand path cmd = do
+    (newPath, newCmd) <- stepIntoCommand path cmd
+    getCommand newPath newCmd
+
+stepIntoCommand :: [String] -> Command out -> Either CommandError ([String],Command out)
+stepIntoCommand path cmd = do
+    crumb <- toEither (ErrNotEnoughPath childKeys) $ Maybe.listToMaybe path
+    newCmd <- toEither (ErrPathNotFound childKeys crumb) $ Map.lookup crumb children
+    return (tail path, newCmd)
+  where
+    children = cmdChildren cmd
+    childKeys = Map.keys children
+
+--
 -- When things go wrong..
 --
 
 data CommandError
     = ErrFlagNotFound [String]
-    | ErrTooMuchInput [String]
-    | ErrNotEnoughInput
-    | ErrCastingFlag String String -- flag that had issues, reason for issue
-    | ErrCastingValue String       -- reason for issue
+    | ErrTooManyValues [String]
+    | ErrNotEnoughValues
+    | ErrNotEnoughPath [String]       -- possible path pieces we expect to see but didn't
+    | ErrPathNotFound [String] String -- possible path pieces, path piece provided.
+    | ErrCastingFlag String String    -- flag that had issues, reason for issue
+    | ErrCastingValue String          -- reason for issue
     deriving (Eq,Show)
+
+--
+-- Util bits for internal use
+--
+
+toEither :: a -> Maybe b -> Either a b
+toEither _ (Just b) = Right b
+toEither a Nothing = Left a
+
+mapLeft :: (a -> c) -> Either a b -> Either c b
+mapLeft fn (Left a)  = Left (fn a)
+mapLeft _ (Right b) = Right b
+
+catchEither :: Either a b -> Either a b -> Either a b
+catchEither (Left a) (Left _) = Left a
+catchEither (Left _) b = b
+catchEither a _ = a

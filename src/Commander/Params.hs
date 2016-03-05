@@ -26,7 +26,7 @@ instance FromText a => ToParam (Flag flags help (Maybe a)) where
     toParam Nothing = Right (Flag Nothing)
 instance ToParam (Flag flags help Bool) where
     toParam (Just "") = Right (Flag True)
-    toParam (Just str) = Left "boolean string does not expect to have a value"
+    toParam (Just _) = Left "boolean string does not expect to have a value"
     toParam Nothing = Right (Flag False)
 instance {-# OVERLAPPABLE #-} FromText a => ToParam (Flag flags help a) where
     toParam (Just str) = fmap Flag (fromText str)
@@ -54,6 +54,9 @@ instance KnownSymbol help => ParamHelp (Value help a) where
 
 class FromText a where
     fromText :: String -> Either String a
+
+instance FromText String where
+    fromText = Right
 
 instance {-# OVERLAPPABLE #-} Read a => FromText a where
     fromText str = case readMaybe str of
