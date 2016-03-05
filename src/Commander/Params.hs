@@ -21,21 +21,30 @@ import Commander.Commands (ToParam(..), ParamFlags(..), ParamHelp(..))
 --
 data Flag (flags :: [Symbol]) (help :: Symbol) a = Flag a
 
-instance FromText a => ToParam (Flag flags help a) where
-    toParam str = fmap Flag (fromText str)
+instance FromText a => ToParam (Flag flags help (Maybe a)) where
+    toParam (Just str) = fmap (Flag . Just) (fromText str)
+    toParam Nothing = Right (Flag Nothing)
+instance ToParam (Flag flags help Bool) where
+    toParam (Just "") = Right (Flag True)
+    toParam (Just str) = Left "boolean string does not expect to have a value"
+    toParam Nothing = Right (Flag False)
+instance {-# OVERLAPPABLE #-} FromText a => ToParam (Flag flags help a) where
+    toParam (Just str) = fmap Flag (fromText str)
+    toParam Nothing = Left "flag expected but not found"
 instance KnownSymbols flags => ParamFlags (Flag flags help a) where
     paramFlags _ = Just $ symbolVals (Proxy :: Proxy flags)
 instance KnownSymbol help => ParamHelp (Flag flags help a) where
-    paramHelp  _ = symbolVal (Proxy :: Proxy help)
+    paramHelp _ = symbolVal (Proxy :: Proxy help)
 
 data Value (help :: Symbol) a = Value a
 
 instance FromText a => ToParam (Value help a) where
-    toParam  str = fmap Value (fromText str)
+    toParam (Just str) = fmap Value (fromText str)
+    toParam Nothing = Left "value expected but none found"
 instance ParamFlags (Value help a) where
     paramFlags _ = Nothing
 instance KnownSymbol help => ParamHelp (Value help a) where
-    paramHelp  _ = symbolVal (Proxy :: Proxy help)
+    paramHelp _ = symbolVal (Proxy :: Proxy help)
 
 --
 -- Typeclass to extract details from flag/value type, or construct the

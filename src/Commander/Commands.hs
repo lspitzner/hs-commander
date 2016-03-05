@@ -53,7 +53,7 @@ import Data.Proxy (Proxy(..))
 type IsParameter a = (ToParam a, ParamFlags a, ParamHelp a)
 
 class ToParam a where
-    toParam :: String -> Either String a
+    toParam :: Maybe String -> Either String a
 
 class ParamFlags a where
     paramFlags :: proxy a -> Maybe [String]
@@ -87,25 +87,24 @@ instance (IsParameter a, InjectParameters b out) => InjectParameters (a -> b) ou
         -- the thing is a value.
         Nothing -> injectValue
       where
+        injectFlag :: [String] -> Either CommandError out
         injectFlag fs = do
-            str <- toEither (ErrFlagNotFound fs)
-                 $ Maybe.listToMaybe
-                 $ Maybe.catMaybes
-                 $ fmap (flip Map.lookup flags) fs
-            param <- mapLeft (ErrCastingFlag str) $ toParam str
+            let (flag, mVal)
+                    = Maybe.fromMaybe (head fs, Nothing)
+                    $ Maybe.listToMaybe
+                    $ filter (Maybe.isJust . snd)
+                    $ fmap (\f -> (f, Map.lookup f flags)) fs
+            param <- mapLeft (ErrCastingFlag flag) $ toParam mVal
             injectParameters flags vals (fn param)
+        injectValue :: Either CommandError out
         injectValue = do
-            str   <- toEither ErrNotEnoughInput $ Maybe.listToMaybe vals
-            param <- mapLeft (ErrCastingValue str) $ toParam str
+            let mVal = Maybe.listToMaybe vals
+            param <- mapLeft ErrCastingValue $ toParam mVal
             injectParameters flags (tail vals) (fn param)
 
 instance {-# OVERLAPPABLE #-} FnOut out ~ out => InjectParameters out out where
     injectParameters _ [] output = Right output
     injectParameters _ vs _ = Left (ErrTooMuchInput vs)
-
-toEither :: a -> Maybe b -> Either a b
-toEither _ (Just b) = Right b
-toEither a Nothing = Left a
 
 mapLeft :: (a -> c) -> Either a b -> Either c b
 mapLeft fn (Left a)  = Left (fn a)
@@ -179,5 +178,5 @@ data CommandError
     | ErrTooMuchInput [String]
     | ErrNotEnoughInput
     | ErrCastingFlag String String -- flag that had issues, reason for issue
-    | ErrCastingValue String String -- value that had issues, reason for value
+    | ErrCastingValue String       -- reason for issue
     deriving (Eq,Show)

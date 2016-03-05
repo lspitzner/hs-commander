@@ -1,5 +1,3 @@
-{-# LANGUAGE IncoherentInstances, FunctionalDependencies, GADTs, RankNTypes, DataKinds, TypeOperators, KindSignatures, TypeFamilies, MultiParamTypeClasses, FlexibleInstances, ScopedTypeVariables, UndecidableInstances #-}
-
 module Commander (
     module Params,
     module Commands
@@ -7,7 +5,6 @@ module Commander (
 
 import Commander.Params   as Params
 import Commander.Commands as Commands
-
 
 ----
 ---- testing lark
