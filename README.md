@@ -65,6 +65,10 @@ The novelty of this approach (compared to others I have seen, which is a non exh
 
 you can run the example code by running `stack install :example1 && example1` assuming that the directory stack copies binaries to is present in your `PATH`.
 
+# Documentation
+
+if you clone this repository locally somewhere, you can use `stack haddock` inside its folder in order to generate haddock documentation for it.
+
 # Disclaimer
 
 This project is still under heavy development and could well change drastically!
