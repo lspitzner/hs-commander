@@ -1,3 +1,11 @@
+-- |
+-- Module: Commander.Params
+--
+-- This module provides a couple of basic function parameter types to be
+-- used in 'Commander.Commands' function definitions. By implementing the
+-- same typeclasses, one can create their own custom types to use instead
+-- (or as well as) if they prefer.
+--
 {-# LANGUAGE
     KindSignatures,
     DataKinds,
@@ -16,9 +24,10 @@ import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import Text.Read (readMaybe)
 import Commander.Commands (ToParam(..), ParamFlags(..), ParamHelp(..))
 
---
--- Flag and Value types to encode information we want.
---
+-- | Use this type in a function embedded in a 'Command' in order to
+-- require a flag. The type signature for this lists the flags that we
+-- want to match against, the associated help text, and the output type
+-- we want the flag to be cast to.
 data Flag (flags :: [Symbol]) (help :: Symbol) a = Flag a
 
 instance FromText a => ToParam (Flag flags help (Maybe a)) where
@@ -36,6 +45,10 @@ instance KnownSymbols flags => ParamFlags (Flag flags help a) where
 instance KnownSymbol help => ParamHelp (Flag flags help a) where
     paramHelp _ = symbolVal (Proxy :: Proxy help)
 
+-- | Use this type in a function embedded in a 'Command' in order to
+-- require a value. The type signature for this contains the associated
+-- help text for the command, and the type we expect the value to be cast
+-- to.
 data Value (help :: Symbol) a = Value a
 
 instance FromText a => ToParam (Value help a) where

@@ -1,11 +1,10 @@
-{-# LANGUAGE FlexibleContexts, GADTs, RankNTypes, DataKinds, TypeOperators, TypeFamilies, ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds, ScopedTypeVariables #-}
 
 module Main where
 
 import qualified Data.Map as Map
-import qualified Data.Maybe as Maybe
-import Commander.Params   as Params
-import Commander.Commands as Commands
+import Commander.Params   (Flag(..), Value(..))
+import Commander.Commands (Command(..), commands, command, help, run, evalCommand)
 
 --
 -- build up a Command (IO ()) object. The IO () is based

@@ -1,23 +1,42 @@
 name:                commander
 version:             0.1.0.0
-synopsis:            Initial project template from stack
-description:         Please see README.md
+synopsis:            pattern matching against string based commands
 homepage:            https://github.com/jsdw/hs-commander
 license:             BSD3
 license-file:        LICENSE
-author:              Author name here
+author:              James Wilson
 maintainer:          me@unbui.lt
-copyright:           2016 James Wilson
-category:            Web
+copyright:           (c) 2016 James Wilson
+stability:           experimental
+category:            Text
 build-type:          Simple
--- extra-source-files:
 cabal-version:       >=1.10
+description:
+    An extensible, format-agnostic command parsing library designed
+    to be easy to use and syntactically light weight.
+    .
+    Assuming we write a parser to convert a command such as
+    .
+    @calculator add 1 2 -v=yes@
+    .
+    Into path and flags such as @["calculator", "add"]@ and @Map.fromList [("v","yes")]@,
+    This library will then match said path and flags against a nested record type of
+    commands built up using lightweight monadic syntax and tries to execute
+    the associated function if the matching and value converting works, or returns
+    an error if the path/flags fail to match any command.
+    .
+    To get started, see the documentation for the @Commander@ module
+    below. Additionally, an /examples/ folder is included in the source
+    illustrating usage - see https://github.com/jsdw/hs-commander for
+    more.
+
+extra-source-files:
+    README.md
+    examples/*
 
 library
   hs-source-dirs:      src
   ghc-options:         -Wall
-                       -fno-warn-type-defaults
-                       -fno-warn-orphans
   exposed-modules:     Commander
                      , Commander.Commands
                      , Commander.Params
