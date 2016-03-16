@@ -108,7 +108,7 @@ class ParamHelp a where
 -- and a map of flags to it. This will either return a 'CommandError' denoting
 -- what failed, or the output from running the function.
 injectParams :: [String] -> Map String String -> Fn out -> Either CommandError out
-injectParams vals flags fnWrapper = case fnWrapper of Fn fn -> injectParameters vals flags fn
+injectParams vals flags fnWrapper = case fnWrapper of Fn fn _ -> injectParameters vals flags fn
 
 type family FnOut fn where
     FnOut (a -> b) = FnOut b
@@ -154,7 +154,7 @@ data Parameter = Parameter
 -- | Run against our @Fn out@ wrapped function, this will return a list of 'Parameter' details
 -- for each parameter in the contained function.
 extractParams :: Fn out -> [Parameter]
-extractParams fnWrapper = case fnWrapper of Fn (_ :: a) -> extractParameters (Proxy :: Proxy a)
+extractParams fnWrapper = case fnWrapper of Fn _ params -> params
 
 class ExtractParameters fn where
     extractParameters :: proxy fn -> [Parameter]
@@ -170,7 +170,8 @@ instance {-# OVERLAPPABLE #-} FnOut out ~ out => ExtractParameters out where
 -- | Our existential 'Fn' type is used for hiding away the details of some provided
 -- function. Any function that satisfies the 'IsParameter' tuple of type classes can
 -- be wrapped in this.
-data Fn out = forall fn. (ExtractParameters fn, InjectParameters fn out) => Fn fn
+data Fn out = forall fn. InjectParameters fn out
+           => Fn fn [Parameter]
 
 instance Show (Fn out) where
     show _ = "<<injectableFunc>>"
@@ -215,8 +216,15 @@ help txt = State.modify $ \c -> c { cmdHelp = txt }
 -- | Attach a function which will be tried if the current command is matched. The parameters
 -- to the function must satisfy the 'IsParameter' typeclasses, which will automatically make
 -- the function satisfy the @ExtractParameters@ and @InjectParameters@ typeclasses.
-run :: (ExtractParameters fn, InjectParameters fn out) => fn -> Commands out ()
-run fn = State.modify $ \c -> c { cmdFunc = Just (Fn fn) }
+run
+  :: forall fn out
+   . (ExtractParameters fn, InjectParameters fn out)
+  => fn
+  -> Commands out ()
+run fn = State.modify
+       $ \c -> c {
+           cmdFunc = Just (Fn fn (extractParameters (Proxy :: Proxy fn)))
+         }
 
 -- $runningcommands
 --
