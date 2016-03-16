@@ -154,23 +154,23 @@ data Parameter = Parameter
 -- | Run against our @Fn out@ wrapped function, this will return a list of 'Parameter' details
 -- for each parameter in the contained function.
 extractParams :: Fn out -> [Parameter]
-extractParams fnWrapper = case fnWrapper of Fn (_ :: a) -> extractParameters (Proxy :: Proxy a) (Proxy :: Proxy out)
+extractParams fnWrapper = case fnWrapper of Fn (_ :: a) -> extractParameters (Proxy :: Proxy a)
 
-class FnOut fn ~ out => ExtractParameters fn out where
-    extractParameters :: proxy fn -> proxy out -> [Parameter]
+class ExtractParameters fn where
+    extractParameters :: proxy fn -> [Parameter]
 
-instance (IsParameter a, ExtractParameters b out) => ExtractParameters (a -> b) out where
-    extractParameters _ _ = param : extractParameters (Proxy :: Proxy b) (Proxy :: Proxy out)
+instance (IsParameter a, ExtractParameters b) => ExtractParameters (a -> b) where
+    extractParameters _ = param : extractParameters (Proxy :: Proxy b)
       where param = Parameter (paramFlags proxya) (paramHelp proxya)
             proxya = Proxy :: Proxy a
 
-instance {-# OVERLAPPABLE #-} FnOut out ~ out => ExtractParameters out out where
-    extractParameters _ _ = []
+instance {-# OVERLAPPABLE #-} FnOut out ~ out => ExtractParameters out where
+    extractParameters _ = []
 
 -- | Our existential 'Fn' type is used for hiding away the details of some provided
 -- function. Any function that satisfies the 'IsParameter' tuple of type classes can
 -- be wrapped in this.
-data Fn out = forall fn. (ExtractParameters fn out, InjectParameters fn out) => Fn fn
+data Fn out = forall fn. (ExtractParameters fn, InjectParameters fn out) => Fn fn
 
 instance Show (Fn out) where
     show _ = "<<injectableFunc>>"
@@ -215,7 +215,7 @@ help txt = State.modify $ \c -> c { cmdHelp = txt }
 -- | Attach a function which will be tried if the current command is matched. The parameters
 -- to the function must satisfy the 'IsParameter' typeclasses, which will automatically make
 -- the function satisfy the @ExtractParameters@ and @InjectParameters@ typeclasses.
-run :: (ExtractParameters fn out, InjectParameters fn out) => fn -> Commands out ()
+run :: (ExtractParameters fn, InjectParameters fn out) => fn -> Commands out ()
 run fn = State.modify $ \c -> c { cmdFunc = Just (Fn fn) }
 
 -- $runningcommands
