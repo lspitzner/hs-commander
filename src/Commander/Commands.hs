@@ -156,16 +156,16 @@ data Parameter = Parameter
 extractParams :: Fn out -> [Parameter]
 extractParams fnWrapper = case fnWrapper of Fn _ params -> params
 
-class ExtractParameters fn where
-    extractParameters :: proxy fn -> [Parameter]
+class HasParameters fn where
+    getParameters :: proxy fn -> [Parameter]
 
-instance (IsParameter a, ExtractParameters b) => ExtractParameters (a -> b) where
-    extractParameters _ = param : extractParameters (Proxy :: Proxy b)
+instance (IsParameter a, HasParameters b) => HasParameters (a -> b) where
+    getParameters _ = param : getParameters (Proxy :: Proxy b)
       where param = Parameter (paramFlags proxya) (paramHelp proxya)
             proxya = Proxy :: Proxy a
 
-instance {-# OVERLAPPABLE #-} FnOut out ~ out => ExtractParameters out where
-    extractParameters _ = []
+instance {-# OVERLAPPABLE #-} FnOut out ~ out => HasParameters out where
+    getParameters _ = []
 
 -- | Our existential 'Fn' type is used for hiding away the details of some provided
 -- function. Any function that satisfies the 'IsParameter' tuple of type classes can
@@ -218,12 +218,12 @@ help txt = State.modify $ \c -> c { cmdHelp = txt }
 -- the function satisfy the @ExtractParameters@ and @InjectParameters@ typeclasses.
 run
   :: forall fn out
-   . (ExtractParameters fn, InjectParameters fn out)
+   . (HasParameters fn, InjectParameters fn out)
   => fn
   -> Commands out ()
 run fn = State.modify
        $ \c -> c {
-           cmdFunc = Just (Fn fn (extractParameters (Proxy :: Proxy fn)))
+           cmdFunc = Just (Fn fn (getParameters (Proxy :: Proxy fn)))
          }
 
 -- $runningcommands
