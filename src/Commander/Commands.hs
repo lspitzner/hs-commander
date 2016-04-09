@@ -9,8 +9,7 @@
     UndecidableInstances,
     ScopedTypeVariables,
     TypeFamilies,
-    ConstraintKinds,
-    ExistentialQuantification #-}
+    ConstraintKinds #-}
 
 module Commander.Commands (
 
@@ -108,17 +107,17 @@ class ParamHelp a where
 -- and a map of flags to it. This will either return a 'CommandError' denoting
 -- what failed, or the output from running the function.
 injectParams :: [String] -> Map String String -> Fn out -> Either CommandError out
-injectParams vals flags fnWrapper = case fnWrapper of Fn fn _ -> injectParameters vals flags fn
+injectParams vals flags fnWrapper = _fn_inject fnWrapper vals flags
 
 type family FnOut fn where
     FnOut (a -> b) = FnOut b
     FnOut a = a
 
-class FnOut fn ~ out => InjectParameters fn out where
-    injectParameters :: [String] -> Map String String -> fn -> Either CommandError out
+class FnOut fn ~ out => HasInjector fn out where
+    getInjector :: fn -> [String] -> Map String String -> Either CommandError out
 
-instance (IsParameter a, InjectParameters b out) => InjectParameters (a -> b) out where
-    injectParameters vals flags fn = case paramFlags (Proxy :: Proxy a) of
+instance (IsParameter a, HasInjector b out) => HasInjector (a -> b) out where
+    getInjector fn vals flags = case paramFlags (Proxy :: Proxy a) of
         -- the thing looks like a flag, but doesnt actually have any!
         Just [] -> Left ErrParamHasNoFlags
         -- the thing does have flags.
@@ -134,16 +133,16 @@ instance (IsParameter a, InjectParameters b out) => InjectParameters (a -> b) ou
                     $ filter (Maybe.isJust . snd)
                     $ fmap (\f -> (f, Map.lookup f flags)) fs
             param <- mapLeft (ErrCastingFlag flag) $ toParam mVal
-            injectParameters vals flags (fn param)
+            getInjector (fn param) vals flags
         injectValue :: Either CommandError out
         injectValue = do
             val <- toEither ErrNotEnoughValues $ Maybe.listToMaybe vals
             param <- mapLeft ErrCastingValue $ toParam (Just val)
-            injectParameters (tail vals) flags (fn param)
+            getInjector (fn param) (tail vals) flags
 
-instance {-# OVERLAPPABLE #-} FnOut out ~ out => InjectParameters out out where
-    injectParameters [] _ output = Right output
-    injectParameters vs _ _ = Left (ErrTooManyValues vs)
+instance {-# OVERLAPPABLE #-} FnOut out ~ out => HasInjector out out where
+    getInjector output [] _ = Right output
+    getInjector _ vs _ = Left (ErrTooManyValues vs)
 
 -- | A type containing information about a function parameter.
 data Parameter = Parameter
@@ -154,7 +153,7 @@ data Parameter = Parameter
 -- | Run against our @Fn out@ wrapped function, this will return a list of 'Parameter' details
 -- for each parameter in the contained function.
 extractParams :: Fn out -> [Parameter]
-extractParams fnWrapper = case fnWrapper of Fn _ params -> params
+extractParams = _fn_extract
 
 class HasParameters fn where
     getParameters :: proxy fn -> [Parameter]
@@ -170,8 +169,10 @@ instance {-# OVERLAPPABLE #-} FnOut out ~ out => HasParameters out where
 -- | Our existential 'Fn' type is used for hiding away the details of some provided
 -- function. Any function that satisfies the 'IsParameter' tuple of type classes can
 -- be wrapped in this.
-data Fn out = forall fn. InjectParameters fn out
-           => Fn fn [Parameter]
+data Fn out = Fn
+  { _fn_inject  :: ([String] -> Map String String -> Either CommandError out)
+  , _fn_extract :: [Parameter]
+  }
 
 instance Show (Fn out) where
     show _ = "<<injectableFunc>>"
@@ -215,15 +216,16 @@ help txt = State.modify $ \c -> c { cmdHelp = txt }
 
 -- | Attach a function which will be tried if the current command is matched. The parameters
 -- to the function must satisfy the 'IsParameter' typeclasses, which will automatically make
--- the function satisfy the @ExtractParameters@ and @InjectParameters@ typeclasses.
+-- the function satisfy the @HasParameters@ and @HasInjector@ typeclasses.
 run
   :: forall fn out
-   . (HasParameters fn, InjectParameters fn out)
+   . (HasParameters fn, HasInjector fn out)
   => fn
   -> Commands out ()
 run fn = State.modify
        $ \c -> c {
-           cmdFunc = Just (Fn fn (getParameters (Proxy :: Proxy fn)))
+           cmdFunc = Just (Fn (getInjector fn)
+                              (getParameters (Proxy :: Proxy fn)))
          }
 
 -- $runningcommands
